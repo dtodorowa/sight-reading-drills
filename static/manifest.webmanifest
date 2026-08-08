@@ -1,0 +1,25 @@
+{
+	"name": "NoteDash",
+	"short_name": "NoteDash",
+	"description": "Fast, adaptive sight-reading drills for piano.",
+	"start_url": "./",
+	"scope": "./",
+	"display": "standalone",
+	"orientation": "portrait",
+	"background_color": "#0d0b14",
+	"theme_color": "#15121f",
+	"icons": [
+		{
+			"src": "./icon.svg",
+			"sizes": "any",
+			"type": "image/svg+xml",
+			"purpose": "any"
+		},
+		{
+			"src": "./icon-maskable.svg",
+			"sizes": "any",
+			"type": "image/svg+xml",
+			"purpose": "maskable"
+		}
+	]
+}
