@@ -4,12 +4,13 @@
 	import { base } from '$app/paths';
 	import { Drill } from '$lib/stores/drill.svelte';
 	import { progress } from '$lib/stores/progress.svelte';
-	import type { Step } from '$lib/music/pitch';
+	import { pitchLabel, type Pitch, type Step } from '$lib/music/pitch';
 	import { summarize, notesPerMinute, type SessionSummary } from '$lib/stats/session';
 	import { reactTo, roundVerdict } from '$lib/copy/encouragement';
 	import { formatPercent, formatSeconds, formatRate } from '$lib/utils/format';
 	import StaffNote from '$lib/components/StaffNote.svelte';
 	import AnswerPad from '$lib/components/AnswerPad.svelte';
+	import PlayPad from '$lib/components/PlayPad.svelte';
 	import StatChip from '$lib/components/StatChip.svelte';
 
 	const drill = new Drill();
@@ -19,6 +20,7 @@
 	let summary = $state<SessionSummary | null>(null);
 	let advanceTimer: ReturnType<typeof setTimeout> | null = null;
 
+	const playMode = $derived(progress.inputMode === 'play');
 	const feedback = $derived(
 		drill.lastCorrect === null ? null : drill.lastCorrect ? 'correct' : 'wrong'
 	);
@@ -38,6 +40,15 @@
 
 	function handleGuess(letter: Step) {
 		const correct = drill.answer(letter, Date.now());
+		afterAnswer(correct);
+	}
+
+	function handlePlayed(pitch: Pitch) {
+		const correct = drill.answerPlayed(pitch, Date.now(), progress.octaveForgiving);
+		afterAnswer(correct);
+	}
+
+	function afterAnswer(correct: boolean) {
 		reaction = reactTo(correct, drill.streak, Math.random);
 		clearAdvance();
 		// Wrong answers linger so the correct note sinks in; right answers snap on.
@@ -85,26 +96,43 @@
 		{#if drill.phase === 'revealed'}
 			{#if drill.lastCorrect}
 				<p class="text-2xl font-black text-green-400">{reaction}</p>
+			{:else if playMode}
+				<p class="text-xl font-bold text-red-300">
+					{reaction}, that was
+					<span class="text-white">{drill.current ? pitchLabel(drill.current.pitch) : ''}</span>
+					{#if drill.lastPlayed}
+						<span class="text-white/50">· you played {pitchLabel(drill.lastPlayed)}</span>
+					{/if}
+				</p>
 			{:else}
 				<p class="text-xl font-bold text-red-300">
 					{reaction}, that one was <span class="text-white">{drill.current?.pitch.step}</span>
 				</p>
 			{/if}
 		{:else}
-			<p class="text-lg font-semibold text-white/40">which note?</p>
+			<p class="text-lg font-semibold text-white/40">
+				{playMode ? 'play what you see' : 'which note?'}
+			</p>
 		{/if}
 	</div>
 
 	<div class="mt-auto">
-		<AnswerPad
-			onGuess={handleGuess}
-			disabled={drill.phase !== 'asking'}
-			correctStep={drill.phase === 'revealed' ? (drill.current?.pitch.step ?? null) : null}
-			guessedStep={drill.lastGuess}
-		/>
-		<p class="mt-3 text-center text-sm text-white/35">
-			tap the letter, or use your keyboard A to G
-		</p>
+		{#if playMode}
+			<PlayPad onPlayed={handlePlayed} active={drill.phase === 'asking'} />
+			<p class="mt-3 text-center text-sm text-white/35">
+				play the note on your piano, the first note you hit counts
+			</p>
+		{:else}
+			<AnswerPad
+				onGuess={handleGuess}
+				disabled={drill.phase !== 'asking'}
+				correctStep={drill.phase === 'revealed' ? (drill.current?.pitch.step ?? null) : null}
+				guessedStep={drill.lastGuess}
+			/>
+			<p class="mt-3 text-center text-sm text-white/35">
+				tap the letter, or use your keyboard A to G
+			</p>
+		{/if}
 	</div>
 {:else if summary}
 	<div class="flex flex-1 flex-col justify-center py-10">

@@ -19,6 +19,9 @@ import { LEVELS } from '$lib/music/levels';
 const STORAGE_KEY = 'notedash.progress.v1';
 const MAX_SESSIONS = 60;
 
+/** How you answer a drill: tap the letter, or play the note on your instrument. */
+export type InputMode = 'tap' | 'play';
+
 type Persisted = {
 	version: 1;
 	byNote: Record<string, NoteStat>;
@@ -28,6 +31,9 @@ type Persisted = {
 	dayStreak: number;
 	lastPracticedDay: number | null;
 	levelId: string;
+	inputMode: InputMode;
+	/** In Play Mode, accept the right note in any octave (a gentler setting). */
+	octaveForgiving: boolean;
 };
 
 function fresh(): Persisted {
@@ -39,7 +45,9 @@ function fresh(): Persisted {
 		totalCorrect: 0,
 		dayStreak: 0,
 		lastPracticedDay: null,
-		levelId: LEVELS[0].id
+		levelId: LEVELS[0].id,
+		inputMode: 'tap',
+		octaveForgiving: false
 	};
 }
 
@@ -69,6 +77,24 @@ class ProgressStore {
 
 	setLevel(levelId: string) {
 		this.#data.levelId = levelId;
+		this.#save();
+	}
+
+	get inputMode(): InputMode {
+		return this.#data.inputMode;
+	}
+
+	setInputMode(mode: InputMode) {
+		this.#data.inputMode = mode;
+		this.#save();
+	}
+
+	get octaveForgiving() {
+		return this.#data.octaveForgiving;
+	}
+
+	setOctaveForgiving(forgiving: boolean) {
+		this.#data.octaveForgiving = forgiving;
 		this.#save();
 	}
 

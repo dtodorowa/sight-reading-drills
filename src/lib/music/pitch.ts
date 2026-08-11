@@ -48,6 +48,49 @@ export function midi(pitch: Pitch): number {
 	return (pitch.octave + 1) * 12 + SEMITONE[pitch.step] + pitch.alter;
 }
 
+// How each of the 12 pitch classes (0 = C) is spelled. Black keys are spelled as
+// sharps, the convention this app already uses everywhere else.
+const PITCH_CLASS: readonly { step: Step; alter: Alter }[] = [
+	{ step: 'C', alter: 0 },
+	{ step: 'C', alter: 1 },
+	{ step: 'D', alter: 0 },
+	{ step: 'D', alter: 1 },
+	{ step: 'E', alter: 0 },
+	{ step: 'F', alter: 0 },
+	{ step: 'F', alter: 1 },
+	{ step: 'G', alter: 0 },
+	{ step: 'G', alter: 1 },
+	{ step: 'A', alter: 0 },
+	{ step: 'A', alter: 1 },
+	{ step: 'B', alter: 0 }
+];
+
+/**
+ * Inverse of `midi()`: the pitch for a MIDI number, spelling black keys as
+ * sharps. This is what turns a detected/played note back into something we can
+ * show on the staff. Non-integer inputs are rounded to the nearest semitone.
+ */
+export function pitchFromMidi(midiNumber: number): Pitch {
+	const rounded = Math.round(midiNumber);
+	const octave = Math.floor(rounded / 12) - 1;
+	const pitchClass = ((rounded % 12) + 12) % 12;
+	const { step, alter } = PITCH_CLASS[pitchClass];
+	return { step, octave, alter };
+}
+
+/**
+ * Did a played note answer the note on the staff? In Play Mode the octave is
+ * part of the reading, so the default is an exact match (enharmonics like F#/Gb
+ * count as equal because they are the same key). `anyOctave` loosens it to "the
+ * right note in any octave", a gentler beginner setting.
+ */
+export function playedMatches(target: Pitch, played: Pitch, anyOctave: boolean): boolean {
+	const targetMidi = midi(target);
+	const playedMidi = midi(played);
+	if (anyOctave) return playedMidi % 12 === targetMidi % 12;
+	return playedMidi === targetMidi;
+}
+
 function alterSymbol(alter: Alter): string {
 	if (alter === 1) return '#';
 	if (alter === -1) return 'b';

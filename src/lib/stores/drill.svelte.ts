@@ -11,7 +11,7 @@ import {
 	type NoteCard
 } from '$lib/music/levels';
 import { pickNote, pushRecent } from '$lib/music/picker';
-import type { Step } from '$lib/music/pitch';
+import { playedMatches, type Pitch, type Step } from '$lib/music/pitch';
 import type { Attempt } from '$lib/stats/session';
 import { progress } from './progress.svelte';
 
@@ -27,6 +27,8 @@ export class Drill {
 	lastCorrect = $state<boolean | null>(null);
 	/** The letter the player tapped, for the reveal UI. */
 	lastGuess = $state<Step | null>(null);
+	/** The full pitch the player played in Play Mode, for the reveal UI. */
+	lastPlayed = $state<Pitch | null>(null);
 
 	// Live session counters, surfaced to the drill screen.
 	answered = $state(0);
@@ -59,6 +61,7 @@ export class Drill {
 		this.bestStreak = 0;
 		this.lastCorrect = null;
 		this.lastGuess = null;
+		this.lastPlayed = null;
 		this.#nextQuestion(now);
 	}
 
@@ -79,6 +82,7 @@ export class Drill {
 		this.#questionStartedAt = now;
 		this.lastCorrect = null;
 		this.lastGuess = null;
+		this.lastPlayed = null;
 		this.phase = 'asking';
 	}
 
@@ -89,13 +93,37 @@ export class Drill {
 	}
 
 	/**
-	 * Answer the current note with a letter. Returns whether it was correct so the
-	 * UI can react. No-op unless we are actively asking.
+	 * Answer the current note with a letter (Tap Mode). Octave-insensitive, since
+	 * the letter pad only names the note. Returns whether it was correct. No-op
+	 * unless we are actively asking.
 	 */
 	answer(letter: Step, now: number): boolean {
 		if (this.phase !== 'asking' || !this.current) return false;
-		const responseMs = Math.max(0, now - this.#questionStartedAt);
 		const correct = this.current.pitch.step === letter;
+		this.lastGuess = letter;
+		this.#score(correct, now);
+		return correct;
+	}
+
+	/**
+	 * Answer by playing a note (Play Mode). Octave matters here unless `anyOctave`
+	 * is set, because reading the exact pitch off the staff is the whole skill.
+	 * Records into the same mastery stats as Tap Mode, so progress is unified.
+	 */
+	answerPlayed(pitch: Pitch, now: number, anyOctave: boolean): boolean {
+		if (this.phase !== 'asking' || !this.current) return false;
+		const correct = playedMatches(this.current.pitch, pitch, anyOctave);
+		this.lastPlayed = pitch;
+		this.lastGuess = pitch.step;
+		this.#score(correct, now);
+		return correct;
+	}
+
+	// Shared bookkeeping for both answer paths: time the response, roll it into
+	// mastery + session stats, bump the live counters, and reveal.
+	#score(correct: boolean, now: number) {
+		if (!this.current) return;
+		const responseMs = Math.max(0, now - this.#questionStartedAt);
 		const id = cardId(this.current);
 
 		this.#attempts.push({ cardId: id, correct, responseMs });
@@ -110,10 +138,8 @@ export class Drill {
 			this.streak = 0;
 		}
 
-		this.lastGuess = letter;
 		this.lastCorrect = correct;
 		this.phase = 'revealed';
-		return correct;
 	}
 
 	/** End the round and persist the summary. Safe to call more than once. */

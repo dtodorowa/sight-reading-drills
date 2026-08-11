@@ -3,6 +3,8 @@ import {
 	diatonicIndex,
 	pitchFromDiatonic,
 	midi,
+	pitchFromMidi,
+	playedMatches,
 	toVexKey,
 	pitchId,
 	pitchLabel,
@@ -45,6 +47,51 @@ describe('midi', () => {
 		expect(midi(p('A', 4))).toBe(69); // concert A
 		expect(midi(p('F', 4, 1))).toBe(66);
 		expect(midi(p('G', 4, -1))).toBe(66); // enharmonic with F#4
+	});
+});
+
+describe('pitchFromMidi', () => {
+	it('anchors 60 to middle C', () => {
+		expect(pitchFromMidi(60)).toEqual(p('C', 4));
+	});
+
+	it('spells black keys as sharps', () => {
+		expect(pitchFromMidi(61)).toEqual(p('C', 4, 1));
+		expect(pitchFromMidi(70)).toEqual(p('A', 4, 1));
+	});
+
+	it('rounds a fractional (detected) number to the nearest semitone', () => {
+		expect(pitchFromMidi(69.3)).toEqual(p('A', 4));
+		expect(pitchFromMidi(68.7)).toEqual(p('A', 4));
+	});
+
+	it('round-trips every natural note back through midi()', () => {
+		for (let octave = 1; octave <= 6; octave++) {
+			for (const step of ['C', 'D', 'E', 'F', 'G', 'A', 'B'] as const) {
+				const pitch = p(step, octave);
+				expect(midi(pitchFromMidi(midi(pitch)))).toBe(midi(pitch));
+			}
+		}
+	});
+});
+
+describe('playedMatches', () => {
+	it('exact mode wants the same pitch and octave', () => {
+		expect(playedMatches(p('C', 4), p('C', 4), false)).toBe(true);
+		expect(playedMatches(p('C', 4), p('C', 5), false)).toBe(false);
+		expect(playedMatches(p('C', 4), p('D', 4), false)).toBe(false);
+	});
+
+	it('exact mode treats enharmonics as the same key', () => {
+		// F#4 and Gb4 are the same piano key, so playing either answers the other.
+		expect(playedMatches(p('F', 4, 1), p('G', 4, -1), false)).toBe(true);
+	});
+
+	it('any-octave mode accepts the right note in a different octave', () => {
+		expect(playedMatches(p('C', 4), p('C', 5), true)).toBe(true);
+		expect(playedMatches(p('C', 4), p('C', 2), true)).toBe(true);
+		expect(playedMatches(p('C', 4), p('C', 4, 1), true)).toBe(false); // C# is a different note
+		expect(playedMatches(p('C', 4), p('B', 3), true)).toBe(false);
 	});
 });
 
